@@ -1,0 +1,27 @@
+Bootstrap: docker
+From: vllm/vllm-openai:v0.11.0
+
+%labels
+    Author paraphrase-robustness
+    Purpose single-H200 inference experiment
+    vLLM 0.11.0
+
+%files
+    environment/requirements.runtime.txt /opt/paraphrase/requirements.runtime.txt
+
+%post
+    python3 -m pip install --no-cache-dir --upgrade pip==25.1.1
+    python3 -m pip install --no-cache-dir -r /opt/paraphrase/requirements.runtime.txt
+
+%environment
+    export PYTHONUNBUFFERED=1
+    export TOKENIZERS_PARALLELISM=false
+    export VLLM_WORKER_MULTIPROC_METHOD=spawn
+    export MPLBACKEND=Agg
+
+%test
+    python3 -c "import datasets, math_verify, sklearn, torch, transformers, vllm; print(torch.__version__, torch.version.cuda, vllm.__version__)"
+
+%runscript
+    exec python3 "$@"
+

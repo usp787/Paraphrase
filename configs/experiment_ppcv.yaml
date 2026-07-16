@@ -1,0 +1,39 @@
+schema_version: 1
+experiment_name: paraphrase_ppcv
+base_experiment: configs/experiment_main.yaml
+model_config: configs/model_qwen3_8b.yaml
+mode: non_thinking
+protocol: practical
+dataset: gsm_symbolic
+
+fidelity:
+  split: confirmatory
+  item_count: 50
+  selection_seed: 20260719
+  form_ids: [original, lexical, syntactic, discourse, free]
+  paraphrase_count: 4
+  candidate_count_including_original: 11
+  critical_positions: 1
+  sc_baseline_samples: 48
+
+lite:
+  split: confirmatory
+  item_count: 100
+  selection_seed: 20260720
+  form_ids: [original, lexical, syntactic]
+  paraphrase_count: 2
+  candidate_count_including_original: 3
+  critical_positions: 1
+  matched_cost_baselines: [sc_8, scop_4x2]
+
+selection:
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  embedding_revision: null
+  rule: similarity_weighted_cross_paraphrase_consistency
+
+teacher_forcing:
+  micro_batch_size: 1
+  candidate_sampling_temperature: 1.0
+  rollout_batch_size: 8
+  checkpoint_every_items: 1
+

@@ -1,0 +1,13 @@
+schema_version: 1
+experiment_name: paraphrase_external
+base_experiment: configs/experiment_main.yaml
+model_config: configs/model_qwen3_8b.yaml
+model_key: external_model
+split: confirmatory
+stratified_item_count: 200
+selection_seed: 20260721
+mode: reasoning
+protocol: practical
+form_ids: [original, lexical, syntactic, discourse, free]
+sampling_seeds: [1103, 2207, 3301]
+

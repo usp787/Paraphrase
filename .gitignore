@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Large or generated experiment artifacts
+environment/*.sif
+data/manifest.jsonl
+data/paraphrases.jsonl
+data/semantic_audit.csv
+data/*.lock.json
+outputs/generations/*.jsonl
+outputs/scores/*.jsonl
+outputs/scores/*.parquet
+outputs/checkpoints/*.json
+reports/figures/*.png
+environment/pip_freeze.txt
+environment/model_revisions.json
+environment/dataset_revisions.json
+environment/slurm_job_metadata*.json
+logs/*
+
+# Keep empty artifact directories in Git.
+!data/.gitkeep
+!outputs/generations/.gitkeep
+!outputs/scores/.gitkeep
+!outputs/checkpoints/.gitkeep
+!reports/figures/.gitkeep
+!logs/.gitkeep
+

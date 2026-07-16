@@ -1,0 +1,84 @@
+schema_version: 1
+experiment_name: paraphrase_main
+run_seed: 20260716
+
+model_config: configs/model_qwen3_8b.yaml
+manifest_path: data/manifest.jsonl
+paraphrases_path: data/paraphrases.jsonl
+semantic_audit_path: data/semantic_audit.csv
+
+datasets:
+  gsm_symbolic:
+    hub_id: apple/GSM-Symbolic
+    hub_config: main
+    split: test
+    revision: null
+    question_field: question
+    answer_field: answer
+    source_id_fields: [id, instance]
+  math_500:
+    hub_id: HuggingFaceH4/MATH-500
+    hub_config: null
+    split: test
+    revision: null
+    question_field: problem
+    answer_field: answer
+    source_id_fields: [unique_id]
+
+split_plan:
+  # Disjoint within each dataset and frozen in data/manifest.lock.json.
+  smoke: 5
+  pilot: 40
+  confirmatory: 200
+  split_seed: 20260716
+
+surface_forms:
+  - form_id: original
+    transformation_type: original
+  - form_id: lexical
+    transformation_type: lexical_substitution
+  - form_id: syntactic
+    transformation_type: syntactic_restructuring
+  - form_id: discourse
+    transformation_type: clause_or_discourse_reordering
+  - form_id: free
+    transformation_type: constrained_free_paraphrase
+  - form_id: voice
+    transformation_type: voice_or_perspective_shift
+  - form_id: referential
+    transformation_type: referential_restructuring
+  - form_id: compositional
+    transformation_type: compositional_restatement
+
+main_form_ids: [original, lexical, syntactic, discourse, free]
+sampling_seeds: [1103, 2207, 3301]
+inference_batch_size: 64
+checkpoint_every_items: 25
+
+paraphrase_generation:
+  generator_model: mistralai/Mistral-7B-Instruct-v0.3
+  generator_revision: null
+  judge_model: Qwen/Qwen2.5-7B-Instruct
+  judge_revision: null
+  max_attempts: 4
+  temperature: 0.7
+  top_p: 0.9
+  max_new_tokens: 512
+  min_normalized_edit_distance: 0.12
+  generation_seed: 20260717
+
+failure_gates:
+  min_human_equivalence_rate: 0.95
+  max_parser_or_judge_undecided_rate: 0.02
+  max_truncation_rate: 0.05
+  max_answer_format_violation_rate: 0.10
+  max_missing_key_rate: 0.0
+  max_duplicate_keys: 0
+
+analysis:
+  bootstrap_resamples: 10000
+  bootstrap_seed: 20260718
+  ece_bins: 10
+  audit_fraction: 0.10
+  audit_min_pairs: 80
+
