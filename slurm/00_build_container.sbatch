@@ -2,7 +2,9 @@
 #SBATCH --job-name=para-build
 #SBATCH --partition=sharing
 #SBATCH --gres=gpu:h100:1
-#SBATCH --time=02:00:00
+# Explorer caps H100 jobs in sharing at one hour. The build is mostly image and
+# package I/O; cached layers make a resubmission cheap if the first pull times out.
+#SBATCH --time=01:00:00
 #SBATCH --mem=64G
 #SBATCH --output=logs/build_%j.out
 #SBATCH --error=logs/build_%j.err

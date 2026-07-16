@@ -1,7 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=para-judge
-#SBATCH --partition=sharing
-#SBATCH --gres=gpu:h100:1
+# Confirmatory adjudication can include thousands of outputs, so it is a longer
+# H200 workload rather than an invalid multi-hour H100 sharing request.
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:h200:1
 #SBATCH --time=04:00:00
 #SBATCH --mem=64G
 #SBATCH --signal=B:USR1@300

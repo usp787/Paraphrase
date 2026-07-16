@@ -39,7 +39,8 @@ The Slurm resource pattern is taken from the accessible
 `C:\Users\usp78\Desktop\on_policy_distillation` project:
 
 - long rounds: `--partition=gpu`, `--gres=gpu:h200:1`;
-- short/staging rounds: `--partition=sharing`, `--gres=gpu:h100:1`;
+- short/staging rounds: `--partition=sharing`, `--gres=gpu:h100:1`, with
+  Explorer's maximum wall time of exactly one hour;
 - CUDA module: `cuda/12.8.0` when available;
 - model/dataset cache on `/scratch/$USER`, not the home quota;
 - append-mode logs and resumable output.
@@ -77,15 +78,18 @@ before `sbatch`; it is already present in this repository.
    sbatch slurm/00_build_container.sbatch
    ```
 
-   The script assumes the cluster supports `apptainer build --fakeroot`. If it
-   does not, build `environment/paraphrase.def` with the university remote builder
-   and export its path for every submission:
+   This is a one-hour H100 sharing job. The script assumes the cluster supports
+   `apptainer build --fakeroot`. If it does not, build
+   `environment/paraphrase.def` with the university remote builder and export its
+   path for every submission:
 
    ```bash
    export PARAPHRASE_SIF=/scratch/$USER/path/to/paraphrase.sif
    ```
 
-2. Resolve/download paraphraser and judge commits, then freeze the data split:
+2. Resolve/download paraphraser and judge commits, then freeze the data split.
+   Staging is divided into narrow groups so each H100 submission stays within one
+   hour. Hugging Face downloads resume from the scratch cache if resubmitted:
 
    ```bash
    sbatch --export=ALL,GROUP=paraphrase,PREPARE_DATA=1 slurm/00_stage_assets.sbatch
@@ -175,8 +179,8 @@ order is frozen in `PREREGISTRATION.md` and never uses correctness.
 
 ### Round 4 — PPCV
 
-Stage the embedding model if `GROUP=all` was not used, then submit the two-task
-array (fidelity and lite are separate H200 allocations):
+Stage the primary and embedding models in a one-hour H100 job, then submit the
+two-task array (fidelity and lite are separate H200 allocations):
 
 ```bash
 sbatch --export=ALL,GROUP=ppcv,PREPARE_DATA=0 slurm/00_stage_assets.sbatch
@@ -188,10 +192,10 @@ includes SC-48; PPCV-lite is compared against Round 3 at measured token/GPU cost
 
 ### Round 5 — external validity
 
-Stage all optional models or specifically run the `all` group, then:
+Stage only the external-validity model in its own one-hour H100 job, then:
 
 ```bash
-sbatch --export=ALL,GROUP=all,PREPARE_DATA=0 slurm/00_stage_assets.sbatch
+sbatch --export=ALL,GROUP=external,PREPARE_DATA=0 slurm/00_stage_assets.sbatch
 sbatch slurm/round5_external.sbatch
 sbatch --export=ALL,SCORE_STEM=external_confirmatory_reasoning_practical slurm/adjudicate_scores.sbatch
 ```

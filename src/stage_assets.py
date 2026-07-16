@@ -41,6 +41,8 @@ def collect_artifacts(group: str) -> list[tuple[str, str, str | None]]:
         return paraphrase
     if group == "ppcv":
         return primary + optional[-1:]
+    if group == "external":
+        return optional[:1]
     return primary + paraphrase + optional
 
 
@@ -60,7 +62,11 @@ def resolve(kind: str, artifact_id: str, requested: str | None) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--group", choices=["primary", "paraphrase", "ppcv", "all"], default="all")
+    parser.add_argument(
+        "--group",
+        choices=["primary", "paraphrase", "ppcv", "external", "all"],
+        default="primary",
+    )
     parser.add_argument("--resolve-only", action="store_true")
     args = parser.parse_args()
 
