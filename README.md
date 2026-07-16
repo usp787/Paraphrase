@@ -38,12 +38,38 @@ The preregistered decisions are restated in [`PREREGISTRATION.md`](PREREGISTRATI
 The Slurm resource pattern is taken from the accessible
 `C:\Users\usp78\Desktop\on_policy_distillation` project:
 
-- long rounds: `--partition=gpu`, `--gres=gpu:h200:1`;
-- short/staging rounds: `--partition=sharing`, `--gres=gpu:h100:1`, with
-  Explorer's maximum wall time of exactly one hour;
+- container build, Hub staging, dataset preparation, and analysis:
+  `--partition=short` with no GPU request;
+- short, resumable inference: `--partition=sharing`, `--gres=gpu:l40s:1`, and
+  Explorer's one-hour sharing maximum;
+- long rounds: `--partition=gpu`, `--gres=gpu:h200:1`, and the guideline's
+  `07:45:00` walltime;
 - CUDA module: `cuda/12.8.0` when available;
 - model/dataset cache on `/scratch/$USER`, not the home quota;
 - append-mode logs and resumable output.
+
+These defaults reflect the supplied GPU Monitor snapshot from 2026-07-16 15:09:
+the single four-GPU H100 node was fully allocated, one L40S node was idle, and
+the queue reported 100 H200 requests. Availability changes continuously. Check
+again immediately before submission:
+
+```bash
+sinfo -p gpu -O "NodeList,Gres:30,GresUsed:30"
+squeue -u "$USER" -o "%.18i %.12P %.24j %.2t %.10M %.6D %R"
+```
+
+Explorer documents `short` as the general CPU queue, `sharing` as a one-hour
+CPU/GPU queue, `gpu-short` as a two-hour GPU queue, and `gpu` as an eight-hour
+maximum single-GPU queue. Command-line `sbatch` options override a script's
+header. For example, if the monitor later shows an A100 free instead of an L40S:
+
+```bash
+sbatch --gres=gpu:a100:1 slurm/round0_smoke_l40s.sbatch
+```
+
+Keep `07:45:00` for a confirmatory run unless the pilot demonstrates that a
+shorter request is safe. A measured shorter walltime can then be supplied with
+`sbatch --time=04:00:00 ...` without editing the frozen experiment config.
 
 That reference project uses Conda, not Apptainer. This repository adds an
 Apptainer runtime while preserving its verified Slurm, module, H200, and scratch
@@ -78,8 +104,9 @@ before `sbatch`; it is already present in this repository.
    sbatch slurm/00_build_container.sbatch
    ```
 
-   This is a one-hour H100 sharing job. The script assumes the cluster supports
-   `apptainer build --fakeroot`. If it does not, build
+   This is a CPU-only `short` job; Apptainer image construction does not need a
+   GPU. The script assumes the cluster supports `apptainer build --fakeroot`. If
+   it does not, build
    `environment/paraphrase.def` with the university remote builder and export its
    path for every submission:
 
@@ -88,35 +115,25 @@ before `sbatch`; it is already present in this repository.
    ```
 
 2. Resolve/download paraphraser and judge commits, then freeze the data split.
-   Staging is divided into narrow groups so each H100 submission stays within one
-   hour. Hugging Face downloads resume from the scratch cache if resubmitted:
+   Staging is a CPU/network job divided into narrow groups to reduce scratch and
+   network pressure. Hugging Face downloads resume from the cache if resubmitted:
 
    ```bash
    sbatch --export=ALL,GROUP=paraphrase,PREPARE_DATA=1 slurm/00_stage_assets.sbatch
    ```
 
-3. Construct forms in increasing-cost order. Each job tries up to four candidates
-   for any rejected pair and is safe to resubmit:
+3. Construct only the smoke forms first. The job tries up to four candidates for
+   any rejected pair and is safe to resubmit:
 
    ```bash
-   sbatch --export=ALL,SPLIT=smoke slurm/00_paraphrases.sbatch
-   sbatch --export=ALL,SPLIT=pilot slurm/00_paraphrases.sbatch
-   sbatch --export=ALL,SPLIT=confirmatory slurm/00_paraphrases.sbatch
+   sbatch --export=ALL,SPLIT=smoke slurm/00_paraphrases_short.sbatch
    ```
 
-4. Complete `data/semantic_audit.csv` without looking at model results. Allowed
-   values are:
+   This uses one L40S for at most one hour. Resubmit unchanged if it needs another
+   slice. Do not generate pilot or confirmatory forms until the preceding stage
+   passes.
 
-   - `equivalence`: `equivalent`, `not_equivalent`, or `uncertain`;
-   - `transformation_label_correct`: `yes`, `no`, or `uncertain`.
-
-   Resolve all uncertain confirmatory cases. This command must pass:
-
-   ```bash
-   apptainer exec "$PARAPHRASE_SIF" python src/build_semantic_audit.py --validate
-   ```
-
-5. Stage Qwen3-8B before requesting the first H200 round:
+4. Stage Qwen3-8B before the smoke inference:
 
    ```bash
    sbatch --export=ALL,GROUP=primary,PREPARE_DATA=0 slurm/00_stage_assets.sbatch
@@ -128,18 +145,28 @@ missing revisions.
 
 ## Experimental rounds
 
-Every long job requests `07:45:00`, receives `USR1` five minutes before timeout,
+Every confirmatory inference job requests `07:45:00`, receives `USR1` five
+minutes before timeout,
 flushes its active batch/item, and can be resubmitted unchanged.
 
 ### Round 0 — smoke, pilot, and controlled decoding
 
 ```bash
+sbatch slurm/round0_smoke_l40s.sbatch
+```
+
+This two-task array runs the practical thinking/non-thinking smoke test on the
+short L40S profile. After both smoke tasks pass, construct the pilot forms. Wait
+for that job to pass, then submit the four H200 pilot tasks (practical plus the
+same-decoding controlled ablation), capped at two simultaneous array tasks:
+
+```bash
+sbatch --export=ALL,SPLIT=pilot slurm/00_paraphrases_short.sbatch
 sbatch slurm/round0_smoke_pilot.sbatch
 ```
 
-This four-task array runs practical thinking/non-thinking pilots plus the
-same-decoding controlled ablation. Use the measured throughput to verify the
-confirmatory size before looking at confirmatory outcomes:
+Use the measured throughput to verify the confirmatory size before looking at
+confirmatory outcomes:
 
 ```bash
 apptainer exec "$PARAPHRASE_SIF" python src/estimate_budget.py \
@@ -151,6 +178,24 @@ Record the go/no-go decision in [`reports/pilot_report.md`](reports/pilot_report
 If throughput requires a smaller confirmatory set, change the split plan and
 regenerate the manifest before any confirmatory inference. Never resize after
 viewing confirmatory accuracy.
+
+Only after the pilot decision is frozen, generate confirmatory forms on the H200:
+
+```bash
+sbatch slurm/00_paraphrases.sbatch
+```
+
+When that job completes, finish `data/semantic_audit.csv` without looking at
+model results. Allowed values are:
+
+- `equivalence`: `equivalent`, `not_equivalent`, or `uncertain`;
+- `transformation_label_correct`: `yes`, `no`, or `uncertain`.
+
+Resolve every uncertain confirmatory case. This command must pass before Round 1:
+
+```bash
+apptainer exec "$PARAPHRASE_SIF" python src/build_semantic_audit.py --validate
+```
 
 ### Rounds 1–3 — main comparison and fixed-budget allocation
 
@@ -179,7 +224,7 @@ order is frozen in `PREREGISTRATION.md` and never uses correctness.
 
 ### Round 4 — PPCV
 
-Stage the primary and embedding models in a one-hour H100 job, then submit the
+Stage the primary and embedding models in a CPU-only job, then submit the
 two-task array (fidelity and lite are separate H200 allocations):
 
 ```bash
@@ -192,7 +237,7 @@ includes SC-48; PPCV-lite is compared against Round 3 at measured token/GPU cost
 
 ### Round 5 — external validity
 
-Stage only the external-validity model in its own one-hour H100 job, then:
+Stage only the external-validity model in its own CPU-only job, then:
 
 ```bash
 sbatch --export=ALL,GROUP=external,PREPARE_DATA=0 slurm/00_stage_assets.sbatch
@@ -205,6 +250,8 @@ sbatch --export=ALL,SCORE_STEM=external_confirmatory_reasoning_practical slurm/a
 ```bash
 sbatch slurm/analyze.sbatch
 ```
+
+Analysis is CPU-only on `short`; it never reserves a GPU.
 
 Outputs:
 

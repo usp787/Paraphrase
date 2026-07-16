@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=para-build
-#SBATCH --partition=sharing
-#SBATCH --gres=gpu:h100:1
-# Explorer caps H100 jobs in sharing at one hour. The build is mostly image and
-# package I/O; cached layers make a resubmission cheap if the first pull times out.
-#SBATCH --time=01:00:00
-#SBATCH --mem=64G
+# Container construction is CPU/network/storage work. Do not hold a scarce GPU.
+# Explorer's short partition is the general CPU queue (48-hour maximum).
+#SBATCH --partition=short
+#SBATCH --cpus-per-task=4
+#SBATCH --time=02:00:00
+#SBATCH --mem=32G
 #SBATCH --output=logs/build_%j.out
 #SBATCH --error=logs/build_%j.err
 
@@ -22,4 +22,7 @@ cd "$PROJECT_ROOT"
 # Explorer-style clusters commonly allow --fakeroot. If yours does not, build
 # the same definition with the university's remote builder and set PARAPHRASE_SIF.
 apptainer build --fakeroot "$SIF" environment/paraphrase.def
-apptainer exec --nv "$SIF" python3 -c "import torch, vllm; print('cuda', torch.cuda.is_available(), 'vllm', vllm.__version__)"
+# Import-test the CUDA-enabled image without reserving or exposing a physical GPU.
+# The first GPU smoke job performs the real driver/device compatibility check.
+apptainer exec "$SIF" python3 -c \
+  "import torch, vllm; print('torch_cuda_build', torch.version.cuda, 'device_visible', torch.cuda.is_available(), 'vllm', vllm.__version__)"

@@ -1,9 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=para-analysis
-#SBATCH --partition=sharing
-#SBATCH --gres=gpu:h100:1
-#SBATCH --time=01:00:00
-#SBATCH --mem=64G
+# Statistical analysis is CPU-only; never reserve a GPU for it.
+#SBATCH --partition=short
+#SBATCH --cpus-per-task=8
+#SBATCH --time=02:00:00
+#SBATCH --mem=32G
 #SBATCH --output=logs/analysis_%j.out
 #SBATCH --error=logs/analysis_%j.err
 #SBATCH --open-mode=append

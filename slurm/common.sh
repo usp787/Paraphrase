@@ -11,10 +11,24 @@ mkdir -p "$PROJECT_ROOT/logs" "$EXPERIMENT_SCRATCH/hf_cache" "$EXPERIMENT_SCRATC
 if ! command -v apptainer >/dev/null 2>&1; then
   module load apptainer 2>/dev/null || module load singularity 2>/dev/null || true
 fi
-module load cuda/12.8.0 2>/dev/null || true
 if ! command -v apptainer >/dev/null 2>&1; then
   echo "Apptainer is unavailable. Load the university's Apptainer module first." >&2
   exit 2
+fi
+
+# Only expose host NVIDIA devices when Slurm actually granted a GPU. This lets
+# build/staging/analysis run on ordinary CPU nodes without an erroneous --nv.
+_HAS_GPU_ALLOCATION=0
+for _gpu_value in \
+  "${SLURM_JOB_GPUS:-}" "${SLURM_STEP_GPUS:-}" "${CUDA_VISIBLE_DEVICES:-}"; do
+  if [[ -n "$_gpu_value" && "$_gpu_value" != "NoDevFiles" ]]; then
+    _HAS_GPU_ALLOCATION=1
+  fi
+done
+_APPTAINER_GPU_ARGS=()
+if [[ "$_HAS_GPU_ALLOCATION" == "1" ]]; then
+  module load cuda/12.8.0 2>/dev/null || true
+  _APPTAINER_GPU_ARGS=(--nv)
 fi
 if [[ ! -f "$SIF" ]]; then
   echo "Missing container: $SIF" >&2
@@ -29,7 +43,11 @@ export APPTAINERENV_PYTHONPATH="$PROJECT_ROOT"
 export APPTAINERENV_TOKENIZERS_PARALLELISM=false
 export APPTAINERENV_VLLM_WORKER_MULTIPROC_METHOD=spawn
 export APPTAINERENV_MPLBACKEND=Agg
-export APPTAINERENV_CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
+if [[ "$_HAS_GPU_ALLOCATION" == "1" ]]; then
+  export APPTAINERENV_CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
+else
+  unset APPTAINERENV_CUDA_VISIBLE_DEVICES
+fi
 for _slurm_name in \
   SLURM_JOB_ID SLURM_JOB_NAME SLURM_JOB_PARTITION SLURM_JOB_NODELIST \
   SLURM_ARRAY_JOB_ID SLURM_ARRAY_TASK_ID SLURM_SUBMIT_DIR; do
@@ -56,7 +74,7 @@ trap '_forward_signal TERM' TERM
 run_py() {
   local status
   set +e
-  apptainer exec --nv --cleanenv \
+  apptainer exec "${_APPTAINER_GPU_ARGS[@]}" --cleanenv \
     --bind "$PROJECT_ROOT:$PROJECT_ROOT" \
     --bind "$SCRATCH_ROOT:$SCRATCH_ROOT" \
     --pwd "$PROJECT_ROOT" \

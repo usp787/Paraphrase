@@ -69,13 +69,16 @@ def result_gate_errors(rows: list[dict], config: dict) -> list[str]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="configs/experiment_main.yaml")
-    parser.add_argument("--stage", choices=["pilot", "confirmatory", "results"], required=True)
+    parser.add_argument(
+        "--stage", choices=["smoke", "pilot", "confirmatory", "results"], required=True
+    )
     parser.add_argument("--input", help="generation or scored JSONL for results gates")
     args = parser.parse_args()
     config = read_yaml(args.config)
     errors = check_frozen_assets(config)
-    if args.stage == "pilot":
-        for split in ("smoke", "pilot"):
+    if args.stage in {"smoke", "pilot"}:
+        required_splits = ("smoke",) if args.stage == "smoke" else ("smoke", "pilot")
+        for split in required_splits:
             validation_path = resolve_path(
                 f"outputs/checkpoints/paraphrase_validation_{split}.json"
             )

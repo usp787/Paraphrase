@@ -1,6 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=para-r0
-#SBATCH --array=0-3
+# Pilot/controlled ablation only. The two practical smoke jobs run first via
+# round0_smoke_l40s.sbatch on the currently less-contended L40S pool.
+#SBATCH --array=0-3%2
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:h200:1
 #SBATCH --time=07:45:00
@@ -24,9 +26,6 @@ case "$SLURM_ARRAY_TASK_ID" in
   *) echo "Unexpected array index" >&2; exit 2 ;;
 esac
 
-if [[ "$PROTOCOL" == "practical" ]]; then
-  run_py src/run_inference.py --experiment main --split smoke --mode "$MODE" --protocol "$PROTOCOL"
-fi
 RUN_ID="main_pilot_${MODE}_${PROTOCOL}"
 run_py src/run_inference.py --experiment main --split pilot --mode "$MODE" --protocol "$PROTOCOL"
 run_py src/score_outputs.py \

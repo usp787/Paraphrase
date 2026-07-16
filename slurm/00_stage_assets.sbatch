@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=para-stage
-#SBATCH --partition=sharing
-#SBATCH --gres=gpu:h100:1
-# Explorer caps H100 jobs in sharing at one hour. Stage one model group per
-# submission; Hugging Face downloads resume from the scratch cache.
-#SBATCH --time=01:00:00
-#SBATCH --mem=64G
+# Hub resolution/download and dataset preparation do not execute the models.
+# Use Explorer's CPU queue instead of waiting for an H100/H200.
+#SBATCH --partition=short
+#SBATCH --cpus-per-task=4
+#SBATCH --time=04:00:00
+#SBATCH --mem=32G
 #SBATCH --output=logs/stage_%j.out
 #SBATCH --error=logs/stage_%j.err
 #SBATCH --open-mode=append
@@ -15,7 +15,7 @@ PROJECT_ROOT="${PARAPHRASE_PROJECT_ROOT:-${SLURM_SUBMIT_DIR:-$PWD}}"
 source "$PROJECT_ROOT/slurm/common.sh"
 record_environment stage
 
-# Use a narrow group so staging fits the sharing limit: paraphrase before form
+# Use a narrow group to limit scratch/network pressure: paraphrase before form
 # construction, primary before Round 0, ppcv before Round 4, external before Round 5.
 GROUP="${GROUP:-primary}"
 run_py src/stage_assets.py --group "$GROUP"
