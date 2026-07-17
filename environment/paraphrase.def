@@ -20,8 +20,7 @@ From: vllm/vllm-openai:v0.11.0
     export MPLBACKEND=Agg
 
 %test
-    python3 -c "import datasets, math_verify, sklearn, torch, transformers, vllm; print(torch.__version__, torch.version.cuda, vllm.__version__)"
+    python3 -c "import datasets, math_verify, pyarrow, sklearn, torch, transformers, vllm; print('datasets', datasets.__version__, 'pyarrow', pyarrow.__version__, 'torch', torch.__version__, 'cuda', torch.version.cuda, 'vllm', vllm.__version__)"
 
 %runscript
     exec python3 "$@"
-

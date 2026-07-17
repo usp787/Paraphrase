@@ -9,11 +9,12 @@ math-verify==0.9.0
 PyYAML==6.0.2
 numpy==2.2.6
 pandas==2.2.3
-pyarrow==19.0.1
+# datasets 4.5.0 requires pyarrow>=21.0.0. Pin the first compatible release;
+# it provides a CPython 3.12 manylinux wheel used by the vLLM 0.11 base image.
+pyarrow==21.0.0
 scipy==1.15.3
 scikit-learn==1.6.1
 matplotlib==3.10.1
 sentence-transformers==3.4.1
 pytest==8.3.5
 ruff==0.11.2
-

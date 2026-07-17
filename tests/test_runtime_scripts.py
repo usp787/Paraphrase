@@ -26,3 +26,13 @@ def test_readme_uses_container_python3_entrypoint():
     text = (ROOT / "README.md").read_text(encoding="utf-8")
     assert 'apptainer exec "$PARAPHRASE_SIF" python ' not in text
     assert 'apptainer exec "$PARAPHRASE_SIF" python3 ' in text
+
+
+def test_datasets_and_pyarrow_pins_are_resolver_compatible():
+    requirements = (ROOT / "environment" / "requirements.runtime.txt").read_text(encoding="utf-8")
+    assert "datasets==4.5.0" in requirements
+    assert "pyarrow==21.0.0" in requirements
+    assert "pyarrow==19.0.1" not in requirements
+
+    definition = (ROOT / "environment" / "paraphrase.def").read_text(encoding="utf-8")
+    assert "import datasets, math_verify, pyarrow" in definition
