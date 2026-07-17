@@ -114,6 +114,22 @@ before `sbatch`; it is already present in this repository.
    export PARAPHRASE_SIF=/scratch/$USER/path/to/paraphrase.sif
    ```
 
+   Do not submit staging or GPU jobs until the build reports `COMPLETED` with
+   `ExitCode 0:0`. Verify the image after the build:
+
+   ```bash
+   export PARAPHRASE_SIF="${PARAPHRASE_SIF:-/scratch/$USER/paraphrase_robustness/container/paraphrase_vllm_0.11.0.sif}"
+   test -s "$PARAPHRASE_SIF" && apptainer inspect "$PARAPHRASE_SIF" >/dev/null && echo "container ready"
+   ```
+
+   Explorer supplies the `apptainer` executable directly; there is no
+   `apptainer` or `singularity` module to load. The build script creates
+   `$APPTAINER_TMPDIR` and `$APPTAINER_CACHEDIR` under scratch before building.
+   The message about using a root-mapped namespace because the user is absent
+   from `/etc/subuid` is informational. If the build later fails inside `%post`
+   with a permission error, that is a separate fakeroot-policy problem and must
+   be reported to Research Computing or handled with a remote/prebuilt image.
+
 2. Resolve/download paraphraser and judge commits, then freeze the data split.
    Staging is a CPU/network job divided into narrow groups to reduce scratch and
    network pressure. Hugging Face downloads resume from the cache if resubmitted:
@@ -169,7 +185,7 @@ Use the measured throughput to verify the confirmatory size before looking at
 confirmatory outcomes:
 
 ```bash
-apptainer exec "$PARAPHRASE_SIF" python src/estimate_budget.py \
+apptainer exec "$PARAPHRASE_SIF" python3 src/estimate_budget.py \
   --generations outputs/generations/main_pilot_non_thinking_practical.jsonl \
   --responses-per-item 15
 ```
@@ -194,7 +210,7 @@ model results. Allowed values are:
 Resolve every uncertain confirmatory case. This command must pass before Round 1:
 
 ```bash
-apptainer exec "$PARAPHRASE_SIF" python src/build_semantic_audit.py --validate
+apptainer exec "$PARAPHRASE_SIF" python3 src/build_semantic_audit.py --validate
 ```
 
 ### Rounds 1–3 — main comparison and fixed-budget allocation

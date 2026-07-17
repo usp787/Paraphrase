@@ -10,14 +10,40 @@
 #SBATCH --error=logs/build_%j.err
 
 set -euo pipefail
-module load apptainer 2>/dev/null || module load singularity 2>/dev/null || true
-command -v apptainer >/dev/null 2>&1 || { echo "Apptainer module not found" >&2; exit 2; }
+if ! command -v apptainer >/dev/null 2>&1; then
+  echo "Apptainer executable not found on $(hostname)." >&2
+  echo "Explorer normally provides the 'apptainer' command directly; no module is required." >&2
+  echo "Check with: command -v apptainer && apptainer --version" >&2
+  exit 127
+fi
 
 PROJECT_ROOT="${PARAPHRASE_PROJECT_ROOT:-${SLURM_SUBMIT_DIR:-$PWD}}"
 SCRATCH_ROOT="${SCRATCH:-/scratch/$USER}"
-SIF="${PARAPHRASE_SIF:-$SCRATCH_ROOT/paraphrase_robustness/container/paraphrase_vllm_0.11.0.sif}"
-mkdir -p "$(dirname "$SIF")" "$PROJECT_ROOT/logs"
+EXPERIMENT_SCRATCH="${PARAPHRASE_SCRATCH:-$SCRATCH_ROOT/paraphrase_robustness}"
+SIF="${PARAPHRASE_SIF:-$EXPERIMENT_SCRATCH/container/paraphrase_vllm_0.11.0.sif}"
+
+# Apptainer needs enough host-side scratch space for an unpacked image while
+# building. Honor an existing cluster/user setting, but always create it first.
+export APPTAINER_TMPDIR="${APPTAINER_TMPDIR:-$SCRATCH_ROOT/apptainer/tmp}"
+export APPTAINER_CACHEDIR="${APPTAINER_CACHEDIR:-$SCRATCH_ROOT/apptainer/cache}"
+mkdir -p \
+  "$APPTAINER_TMPDIR" \
+  "$APPTAINER_CACHEDIR" \
+  "$(dirname "$SIF")" \
+  "$PROJECT_ROOT/logs"
+if [[ ! -w "$APPTAINER_TMPDIR" || ! -w "$APPTAINER_CACHEDIR" ]]; then
+  echo "Apptainer scratch directories are not writable:" >&2
+  echo "  APPTAINER_TMPDIR=$APPTAINER_TMPDIR" >&2
+  echo "  APPTAINER_CACHEDIR=$APPTAINER_CACHEDIR" >&2
+  exit 2
+fi
 cd "$PROJECT_ROOT"
+
+echo "apptainer=$(command -v apptainer)"
+apptainer --version
+echo "APPTAINER_TMPDIR=$APPTAINER_TMPDIR"
+echo "APPTAINER_CACHEDIR=$APPTAINER_CACHEDIR"
+df -h "$APPTAINER_TMPDIR" "$APPTAINER_CACHEDIR"
 
 # Explorer-style clusters commonly allow --fakeroot. If yours does not, build
 # the same definition with the university's remote builder and set PARAPHRASE_SIF.

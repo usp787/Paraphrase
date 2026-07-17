@@ -5,15 +5,20 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRATCH_ROOT="${SCRATCH:-/scratch/$USER}"
 EXPERIMENT_SCRATCH="${PARAPHRASE_SCRATCH:-$SCRATCH_ROOT/paraphrase_robustness}"
 SIF="${PARAPHRASE_SIF:-$EXPERIMENT_SCRATCH/container/paraphrase_vllm_0.11.0.sif}"
+export APPTAINER_TMPDIR="${APPTAINER_TMPDIR:-$SCRATCH_ROOT/apptainer/tmp}"
+export APPTAINER_CACHEDIR="${APPTAINER_CACHEDIR:-$SCRATCH_ROOT/apptainer/cache}"
 
-mkdir -p "$PROJECT_ROOT/logs" "$EXPERIMENT_SCRATCH/hf_cache" "$EXPERIMENT_SCRATCH/tmp"
+mkdir -p \
+  "$PROJECT_ROOT/logs" \
+  "$EXPERIMENT_SCRATCH/hf_cache" \
+  "$EXPERIMENT_SCRATCH/tmp" \
+  "$APPTAINER_TMPDIR" \
+  "$APPTAINER_CACHEDIR"
 
 if ! command -v apptainer >/dev/null 2>&1; then
-  module load apptainer 2>/dev/null || module load singularity 2>/dev/null || true
-fi
-if ! command -v apptainer >/dev/null 2>&1; then
-  echo "Apptainer is unavailable. Load the university's Apptainer module first." >&2
-  exit 2
+  echo "Apptainer executable not found on $(hostname)." >&2
+  echo "Explorer normally provides the command directly; do not load an apptainer module." >&2
+  exit 127
 fi
 
 # Only expose host NVIDIA devices when Slurm actually granted a GPU. This lets

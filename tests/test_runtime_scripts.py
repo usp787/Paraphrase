@@ -1,0 +1,28 @@
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_apptainer_build_prepares_host_scratch_before_building():
+    text = (ROOT / "slurm" / "00_build_container.sbatch").read_text(encoding="utf-8")
+    assert 'export APPTAINER_TMPDIR="${APPTAINER_TMPDIR:-$SCRATCH_ROOT/apptainer/tmp}"' in text
+    assert (
+        'export APPTAINER_CACHEDIR="${APPTAINER_CACHEDIR:-$SCRATCH_ROOT/apptainer/cache}"' in text
+    )
+    assert text.index('mkdir -p \\\n  "$APPTAINER_TMPDIR"') < text.index(
+        'apptainer build --fakeroot "$SIF"'
+    )
+
+
+def test_explorer_runtime_does_not_try_nonexistent_container_modules():
+    for relative in ("slurm/00_build_container.sbatch", "slurm/common.sh"):
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        assert "module load apptainer" not in text
+        assert "module load singularity" not in text
+        assert "command -v apptainer" in text
+
+
+def test_readme_uses_container_python3_entrypoint():
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert 'apptainer exec "$PARAPHRASE_SIF" python ' not in text
+    assert 'apptainer exec "$PARAPHRASE_SIF" python3 ' in text
