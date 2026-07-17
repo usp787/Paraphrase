@@ -22,6 +22,19 @@ def test_explorer_runtime_does_not_try_nonexistent_container_modules():
         assert "command -v apptainer" in text
 
 
+def test_apptainer_runtime_cannot_import_host_user_site_packages():
+    common = (ROOT / "slurm" / "common.sh").read_text(encoding="utf-8")
+    assert "export APPTAINERENV_PYTHONNOUSERSITE=1" in common
+    assert 'expected = "0.11.0"' in common
+    assert 'if ".local" in location.parts:' in common
+
+    definition = (ROOT / "environment" / "paraphrase.def").read_text(encoding="utf-8")
+    assert "export PYTHONNOUSERSITE=1" in definition
+
+    build = (ROOT / "slurm" / "00_build_container.sbatch").read_text(encoding="utf-8")
+    assert "apptainer exec --cleanenv --env PYTHONNOUSERSITE=1" in build
+
+
 def test_readme_uses_container_python3_entrypoint():
     text = (ROOT / "README.md").read_text(encoding="utf-8")
     assert 'apptainer exec "$PARAPHRASE_SIF" python ' not in text

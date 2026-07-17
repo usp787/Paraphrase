@@ -15,6 +15,7 @@ From: vllm/vllm-openai:v0.11.0
 
 %environment
     export PYTHONUNBUFFERED=1
+    export PYTHONNOUSERSITE=1
     export TOKENIZERS_PARALLELISM=false
     export VLLM_WORKER_MULTIPROC_METHOD=spawn
     export MPLBACKEND=Agg

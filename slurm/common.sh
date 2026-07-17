@@ -45,6 +45,9 @@ export APPTAINERENV_HF_HOME="$EXPERIMENT_SCRATCH/hf_cache"
 export APPTAINERENV_HF_DATASETS_CACHE="$EXPERIMENT_SCRATCH/hf_cache/datasets"
 export APPTAINERENV_TMPDIR="$EXPERIMENT_SCRATCH/tmp"
 export APPTAINERENV_PYTHONPATH="$PROJECT_ROOT"
+# Explorer bind-mounts $HOME into the container by default.  Without this,
+# Python may import incompatible packages from $HOME/.local instead of the SIF.
+export APPTAINERENV_PYTHONNOUSERSITE=1
 export APPTAINERENV_TOKENIZERS_PARALLELISM=false
 export APPTAINERENV_VLLM_WORKER_MULTIPROC_METHOD=spawn
 export APPTAINERENV_MPLBACKEND=Agg
@@ -101,5 +104,21 @@ run_py() {
 }
 
 record_environment() {
+  # Fail early with a readable error if a host package leaks into the image.
+  run_py -c '
+from pathlib import Path
+import vllm
+
+expected = "0.11.0"
+location = Path(vllm.__file__).resolve()
+print(f"container_vllm={vllm.__version__} location={location}", flush=True)
+if vllm.__version__ != expected:
+    raise RuntimeError(
+        f"Expected vLLM {expected} from the Apptainer image, but loaded "
+        f"{vllm.__version__} from {location}"
+    )
+if ".local" in location.parts:
+    raise RuntimeError(f"Host user-site package leaked into container: {location}")
+'
   run_py src/record_environment.py --label "$1"
 }

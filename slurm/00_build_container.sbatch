@@ -49,6 +49,8 @@ df -h "$APPTAINER_TMPDIR" "$APPTAINER_CACHEDIR"
 # the same definition with the university's remote builder and set PARAPHRASE_SIF.
 apptainer build --fakeroot "$SIF" environment/paraphrase.def
 # Import-test the CUDA-enabled image without reserving or exposing a physical GPU.
-# The first GPU smoke job performs the real driver/device compatibility check.
-apptainer exec "$SIF" python3 -c \
-  "import torch, vllm; print('torch_cuda_build', torch.version.cuda, 'device_visible', torch.cuda.is_available(), 'vllm', vllm.__version__)"
+# Disable the host user site here too, so this check tests the image rather than
+# an incompatible package under $HOME/.local.  The first GPU smoke job performs
+# the real driver/device compatibility check.
+apptainer exec --cleanenv --env PYTHONNOUSERSITE=1 "$SIF" python3 -c \
+  "import torch, vllm; print('torch_cuda_build', torch.version.cuda, 'device_visible', torch.cuda.is_available(), 'vllm', vllm.__version__, 'vllm_path', vllm.__file__); assert vllm.__version__ == '0.11.0'"
